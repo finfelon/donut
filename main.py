@@ -182,3 +182,38 @@ st.plotly_chart(fig5, use_container_width=True)
 st.info(
     "💡 **이 그래프로 알 수 있는 것:** 주요 장르별 흥행의 중간값(중위수)과 편차 범위, 그리고 상자 밖의 독보적인 흥행 대작(이상치 영화)들을 한눈에 비교할 수 있습니다."
 )
+
+st.markdown("---")
+
+# ---------------------------------------------------------
+# 6. 스크린수, 총 관객수, 첫 주 관객수의 관계 (버블 그래프)
+# ---------------------------------------------------------
+st.subheader("6. 개봉일 스크린수, 총 관객수, 첫 주 관객수 (버블 그래프)")
+
+fig6 = px.scatter(
+    df,
+    x="first_scrn",
+    y="total_audi",
+    size="first_week_audi",
+    color="genre",
+    hover_name="movieNm",
+    size_max=40,  # 버블의 최대 크기 설정
+    title="개봉일 스크린수 대비 총 관객수 및 첫 주 관객수 버블 그래프",
+    labels={
+        "first_scrn": "개봉일 스크린수 (개)",
+        "total_audi": "총 관객수 (명)",
+        "genre": "장르",
+        "first_week_audi": "개봉 첫 주 관객수 (명)",
+    },
+)
+
+# 툴팁에 첫 주 관객수 추가 표시
+fig6.update_traces(
+    hovertemplate="<b>%{hovertext}</b><br>개봉일 스크린수: %{x:,}개<br>총 관객수: %{y:,}명<br>개봉 첫 주 관객: %{marker.size:,}명"
+)
+
+st.plotly_chart(fig6, use_container_width=True)
+
+st.info(
+    "💡 **이 그래프로 알 수 있는 것:** 점의 크기(첫 주 관객수)를 통해 초반 흥행 몰이가 최종 관객수에 얼마나 큰 영향을 미치는지 입체적으로 파악할 수 있습니다."
+)
