@@ -17,6 +17,9 @@ def load_data():
 
     # 장르 전처리: '|' 기호로 구분된 여러 장르 중 첫 번째 장르만 추출
     df["genre"] = df["genre"].astype(str).apply(lambda x: x.split("|")[0])
+    
+    # 영화 편수 계산을 위한 임시 컬럼 추가
+    df["movie_count"] = 1
 
     return df
 
@@ -197,7 +200,7 @@ fig6 = px.scatter(
     size="first_week_audi",
     color="genre",
     hover_name="movieNm",
-    size_max=40,  # 버블의 최대 크기 설정
+    size_max=40,
     title="개봉일 스크린수 대비 총 관객수 및 첫 주 관객수 버블 그래프",
     labels={
         "first_scrn": "개봉일 스크린수 (개)",
@@ -207,7 +210,6 @@ fig6 = px.scatter(
     },
 )
 
-# 툴팁에 첫 주 관객수 추가 표시
 fig6.update_traces(
     hovertemplate="<b>%{hovertext}</b><br>개봉일 스크린수: %{x:,}개<br>총 관객수: %{y:,}명<br>개봉 첫 주 관객: %{marker.size:,}명"
 )
@@ -216,4 +218,31 @@ st.plotly_chart(fig6, use_container_width=True)
 
 st.info(
     "💡 **이 그래프로 알 수 있는 것:** 점의 크기(첫 주 관객수)를 통해 초반 흥행 몰이가 최종 관객수에 얼마나 큰 영향을 미치는지 입체적으로 파악할 수 있습니다."
+)
+
+st.markdown("---")
+
+# ---------------------------------------------------------
+# 7. 제작 국가 및 장르별 영화 편수 (선버스트 그래프)
+# ---------------------------------------------------------
+st.subheader("7. 제작 국가 및 장르별 영화 편수 (선버스트 그래프)")
+
+fig7 = px.sunburst(
+    df,
+    path=[px.Constant("전체 국가"), "nation", "genre"],
+    values="movie_count",
+    title="제작 국가별 주력 장르 선버스트",
+    color="nation",
+)
+
+# 마우스오버 툴팁 설정
+fig7.update_traces(
+    hovertemplate="<b>%{label}</b><br>영화 편수: %{value}편",
+    textinfo="label+percent parent" # 해당 구역의 이름과 상위 항목 대비 비율 표시
+)
+
+st.plotly_chart(fig7, use_container_width=True)
+
+st.info(
+    "💡 **이 그래프로 알 수 있는 것:** 특정 국가에서 어떤 장르의 영화를 많이 제작하여 개봉했는지, 국가 간 주력 장르의 차이를 계층적으로 파악할 수 있습니다."
 )
