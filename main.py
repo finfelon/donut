@@ -9,16 +9,32 @@ st.set_page_config(
 )
 
 
-# 데이터 로드 및 전처리 함수
+# 데이터 로드 및 강건한 전처리 함수
 @st.cache_data
 def load_data():
     url = "https://raw.githubusercontent.com/greatsong/modudata/main/data/kobis_movies.csv"
     df = pd.read_csv(url)
 
-    # 장르 전처리: 파이썬 최신 라이브러리 버전에 안전한 .str 전용 메서드 사용
-    df["genre"] = df["genre"].astype(str).str.split("|").str[0]
+    # 1. 텍스트 열 결측치 처리 및 장르 추출 (.str 전용 안전 메서드)
+    df["genre"] = df["genre"].fillna("미상").astype(str).str.split("|").str[0]
+    df["nation"] = df["nation"].fillna("기타").astype(str)
+    df["movieNm"] = df["movieNm"].fillna("제목없음").astype(str)
 
-    # 영화 편수 계산을 위한 임시 컬럼 추가
+    # 2. 숫자형 열 수치 변환 (쉼표 제거 및 결측치 0 처리)
+    numeric_cols = [
+        "first_scrn",
+        "first_show",
+        "first_week_audi",
+        "total_audi",
+        "days_in_top10",
+    ]
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(
+                df[col].astype(str).str.replace(",", ""), errors="coerce"
+            ).fillna(0)
+
+    # 3. 선버스트/트리맵용 개수 컬럼
     df["movie_count"] = 1
 
     return df
@@ -49,7 +65,7 @@ fig1 = px.pie(
     title="장르별 영화 편수 비율",
 )
 fig1.update_traces(
-    hovertemplate="<b>장르: %{label}</b><br>편수: %{value}편<br>비율: %{percent}"
+    hovertemplate="<b>장르: %{label}</b><br>편수: %{value}편<br>비율: %{percent}<extra></extra>"
 )
 
 st.plotly_chart(fig1, use_container_width=True)
@@ -72,8 +88,8 @@ fig2 = px.treemap(
     color="genre",
 )
 fig2.update_traces(
-    hovertemplate="<b>%{label}</b><br>총 관객수: %{value:,}명",
-    texttemplate="<b>%{label}</b><br>%{value:,}명",
+    hovertemplate="<b>%{label}</b><br>총 관객수: %{value:,.0f}명<extra></extra>",
+    texttemplate="<b>%{label}</b><br>%{value:,.0f}명",
 )
 
 st.plotly_chart(fig2, use_container_width=True)
@@ -96,7 +112,7 @@ fig3 = px.histogram(
     labels={"total_audi": "총 관객수", "count": "영화 수"},
 )
 fig3.update_traces(
-    hovertemplate="관객수 구간: %{x}<br>영화 수: %{y}편",
+    hovertemplate="관객수 구간: %{x:,.0f}명<br>영화 수: %{y}편<extra></extra>",
     marker_color="#1f77b4",
 )
 fig3.update_layout(yaxis_title="영화 수 (편)")
@@ -106,9 +122,9 @@ st.plotly_chart(fig3, use_container_width=True)
 # 주요 통계 데이터 산출
 top_movie_row = df.loc[df["total_audi"].idxmax()]
 top_movie_name = top_movie_row["movieNm"]
-top_movie_audi = top_movie_row["total_audi"]
+top_movie_audi = int(top_movie_row["total_audi"])
 
-under_2m_count = (df["total_audi"] <= 2000000).sum()
+under_2m_count = int((df["total_audi"] <= 2000000).sum())
 under_2m_ratio = (under_2m_count / len(df)) * 100
 
 st.markdown(
@@ -144,7 +160,7 @@ fig4 = px.scatter(
 )
 
 fig4.update_traces(
-    hovertemplate="<b>%{hovertext}</b><br>개봉일 스크린수: %{x:,}개<br>총 관객수: %{y:,}명"
+    hovertemplate="<b>%{hovertext}</b><br>개봉일 스크린수: %{x:,.0f}개<br>총 관객수: %{y:,.0f}명<extra></extra>"
 )
 
 st.plotly_chart(fig4, use_container_width=True)
@@ -176,7 +192,7 @@ fig5 = px.box(
 )
 
 fig5.update_traces(
-    hovertemplate="<b>%{hovertext}</b><br>장르: %{x}<br>총 관객수: %{y:,}명"
+    hovertemplate="<b>%{hovertext}</b><br>장르: %{x}<br>총 관객수: %{y:,.0f}명<extra></extra>"
 )
 
 st.plotly_chart(fig5, use_container_width=True)
@@ -199,6 +215,7 @@ fig6 = px.scatter(
     size="first_week_audi",
     color="genre",
     hover_name="movieNm",
+    custom_data=["first_week_audi"],
     size_max=40,
     title="개봉일 스크린수 대비 총 관객수 및 첫 주 관객수 버블 그래프",
     labels={
@@ -210,7 +227,7 @@ fig6 = px.scatter(
 )
 
 fig6.update_traces(
-    hovertemplate="<b>%{hovertext}</b><br>개봉일 스크린수: %{x:,}개<br>총 관객수: %{y:,}명<br>개봉 첫 주 관객: %{marker.size:,}명"
+    hovertemplate="<b>%{hovertext}</b><br>개봉일 스크린수: %{x:,.0f}개<br>총 관객수: %{y:,.0f}명<br>개봉 첫 주 관객: %{customdata[0]:,.0f}명<extra></extra>"
 )
 
 st.plotly_chart(fig6, use_container_width=True)
@@ -235,8 +252,7 @@ fig7 = px.sunburst(
 )
 
 fig7.update_traces(
-    hovertemplate="<b>%{label}</b><br>영화 편수: %{value}편",
-    textinfo="label+percent parent",
+    hovertemplate="<b>%{label}</b><br>영화 편수: %{value}편<extra></extra>"
 )
 
 st.plotly_chart(fig7, use_container_width=True)
@@ -267,7 +283,7 @@ fig8 = px.scatter(
 )
 
 fig8.update_traces(
-    hovertemplate="<b>%{hovertext}</b><br>10위권 유지 일수: %{x}일<br>총 관객수: %{y:,}명"
+    hovertemplate="<b>%{hovertext}</b><br>10위권 유지 일수: %{x}일<br>총 관객수: %{y:,.0f}명<extra></extra>"
 )
 
 st.plotly_chart(fig8, use_container_width=True)
