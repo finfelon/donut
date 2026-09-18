@@ -15,15 +15,10 @@ def load_data():
     url = "https://raw.githubusercontent.com/greatsong/modudata/main/data/kobis_movies.csv"
     df = pd.read_csv(url)
 
-    # 장르 전처리 (PyArrow 호환 안전 방식)
-    df["genre"] = df["genre"].astype(str).str.split("|").str[0]
+    # 장르 전처리: '|' 기호로 구분된 여러 장르 중 첫 번째 장르만 추출
+    df["genre"] = df["genre"].astype(str).apply(lambda x: x.split("|")[0])
 
-    # 숫자형 컬럼 결측치 처리 및 형변환
-    df["total_audi"] = pd.to_numeric(df["total_audi"], errors="coerce").fillna(0)
-    df["first_scrn"] = pd.to_numeric(df["first_scrn"], errors="coerce").fillna(0)
-    df["first_week_audi"] = pd.to_numeric(df["first_week_audi"], errors="coerce").fillna(0)
-
-    # 영화 편수 계산용 컬럼
+    # 영화 편수 계산을 위한 임시 컬럼 추가
     df["movie_count"] = 1
 
     return df
@@ -69,19 +64,16 @@ st.markdown("---")
 # ---------------------------------------------------------
 st.subheader("2. 장르 및 영화별 총 관객수 분포")
 
-# 장르 및 영화별 중복 집계 방지
-df_treemap = df.groupby(["genre", "movieNm"], as_index=False)["total_audi"].sum()
-
 fig2 = px.treemap(
-    df_treemap,
-    path=["genre", "movieNm"],
+    df,
+    path=[px.Constant("전체 장르"), "genre", "movieNm"],
     values="total_audi",
     title="장르 및 영화별 총 관객수 트리맵",
     color="genre",
 )
-
 fig2.update_traces(
-    hovertemplate="<b>%{label}</b><br>총 관객수: %{value:,.0f}명"
+    hovertemplate="<b>%{label}</b><br>총 관객수: %{value:,}명",
+    texttemplate="<b>%{label}</b><br>%{value:,}명",
 )
 
 st.plotly_chart(fig2, use_container_width=True)
@@ -114,7 +106,7 @@ st.plotly_chart(fig3, use_container_width=True)
 # 주요 통계 데이터 산출
 top_movie_row = df.loc[df["total_audi"].idxmax()]
 top_movie_name = top_movie_row["movieNm"]
-top_movie_audi = int(top_movie_row["total_audi"])
+top_movie_audi = top_movie_row["total_audi"]
 
 under_2m_count = (df["total_audi"] <= 2000000).sum()
 under_2m_ratio = (under_2m_count / len(df)) * 100
@@ -152,7 +144,7 @@ fig4 = px.scatter(
 )
 
 fig4.update_traces(
-    hovertemplate="<b>%{hovertext}</b><br>개봉일 스크린수: %{x:,.0f}개<br>총 관객수: %{y:,.0f}명"
+    hovertemplate="<b>%{hovertext}</b><br>개봉일 스크린수: %{x:,}개<br>총 관객수: %{y:,}명"
 )
 
 st.plotly_chart(fig4, use_container_width=True)
@@ -184,7 +176,7 @@ fig5 = px.box(
 )
 
 fig5.update_traces(
-    hovertemplate="<b>%{hovertext}</b><br>장르: %{x}<br>총 관객수: %{y:,.0f}명"
+    hovertemplate="<b>%{hovertext}</b><br>장르: %{x}<br>총 관객수: %{y:,}명"
 )
 
 st.plotly_chart(fig5, use_container_width=True)
@@ -218,7 +210,7 @@ fig6 = px.scatter(
 )
 
 fig6.update_traces(
-    hovertemplate="<b>%{hovertext}</b><br>개봉일 스크린수: %{x:,.0f}개<br>총 관객수: %{y:,.0f}명<br>개봉 첫 주 관객: %{marker.size:,.0f}명"
+    hovertemplate="<b>%{hovertext}</b><br>개봉일 스크린수: %{x:,}개<br>총 관객수: %{y:,}명<br>개봉 첫 주 관객: %{marker.size:,}명"
 )
 
 st.plotly_chart(fig6, use_container_width=True)
@@ -234,11 +226,9 @@ st.markdown("---")
 # ---------------------------------------------------------
 st.subheader("7. 제작 국가 및 장르별 영화 편수 (선버스트 그래프)")
 
-df_sunburst = df.groupby(["nation", "genre"], as_index=False)["movie_count"].sum()
-
 fig7 = px.sunburst(
-    df_sunburst,
-    path=["nation", "genre"],
+    df,
+    path=[px.Constant("전체 국가"), "nation", "genre"],
     values="movie_count",
     title="제작 국가별 주력 장르 선버스트",
     color="nation",
@@ -253,4 +243,35 @@ st.plotly_chart(fig7, use_container_width=True)
 
 st.info(
     "💡 **이 그래프로 알 수 있는 것:** 특정 국가에서 어떤 장르의 영화를 많이 제작하여 개봉했는지, 국가 간 주력 장르의 차이를 계층적으로 파악할 수 있습니다."
+)
+
+st.markdown("---")
+
+# ---------------------------------------------------------
+# 8. 10위권 유지 일수와 총 관객수 (장르별 몰입도 및 롱런 산점도)
+# ---------------------------------------------------------
+st.subheader("8. 10위권 유지 일수 대비 총 관객수 (장르별 흥미도/롱런 분석)")
+
+fig8 = px.scatter(
+    df,
+    x="days_in_top10",
+    y="total_audi",
+    color="genre",
+    hover_name="movieNm",
+    title="10위권 머문 날수 대비 총 관객수 산점도",
+    labels={
+        "days_in_top10": "10위권 유지 일수 (일)",
+        "total_audi": "총 관객수 (명)",
+        "genre": "장르",
+    },
+)
+
+fig8.update_traces(
+    hovertemplate="<b>%{hovertext}</b><br>10위권 유지 일수: %{x}일<br>총 관객수: %{y:,}명"
+)
+
+st.plotly_chart(fig8, use_container_width=True)
+
+st.info(
+    "💡 **이 그래프로 알 수 있는 것:** 관객의 높은 몰입도로 이탈 없이 롱런한 영화(오랫동안 10위권을 유지하며 고관객을 달성한 작품)와 특정 장르의 흥행 지속력을 분석할 수 있습니다."
 )
