@@ -15,9 +15,9 @@ def load_data():
     url = "https://raw.githubusercontent.com/greatsong/modudata/main/data/kobis_movies.csv"
     df = pd.read_csv(url)
 
-    # 장르 전처리: '|' 기호로 구분된 여러 장르 중 첫 번째 장르만 추출
-    df["genre"] = df["genre"].astype(str).apply(lambda x: x.split("|")[0])
-    
+    # 장르 전처리 (PyArrow 호환을 위해 .str 접근자 사용)
+    df["genre"] = df["genre"].astype(str).str.split("|").str[0]
+
     # 영화 편수 계산을 위한 임시 컬럼 추가
     df["movie_count"] = 1
 
@@ -160,7 +160,6 @@ st.markdown("---")
 # ---------------------------------------------------------
 st.subheader("5. 주요 장르별 총 관객수 분포 (10편 이상 장르)")
 
-# 영화 수가 10편 이상인 장르 필터링
 genre_counts_series = df["genre"].value_counts()
 top_genres = genre_counts_series[genre_counts_series >= 10].index
 df_filtered = df[df["genre"].isin(top_genres)]
@@ -173,7 +172,7 @@ fig5 = px.box(
     hover_name="movieNm",
     title="영화 수 10편 이상 장르의 관객수 박스플롯",
     labels={"genre": "장르", "total_audi": "총 관객수 (명)"},
-    points="outliers",  # 이상치(아웃라이어) 점 표시
+    points="outliers",
 )
 
 fig5.update_traces(
@@ -235,10 +234,9 @@ fig7 = px.sunburst(
     color="nation",
 )
 
-# 마우스오버 툴팁 설정
 fig7.update_traces(
     hovertemplate="<b>%{label}</b><br>영화 편수: %{value}편",
-    textinfo="label+percent parent" # 해당 구역의 이름과 상위 항목 대비 비율 표시
+    textinfo="label+percent parent",
 )
 
 st.plotly_chart(fig7, use_container_width=True)
