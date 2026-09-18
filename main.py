@@ -15,8 +15,8 @@ def load_data():
     url = "https://raw.githubusercontent.com/greatsong/modudata/main/data/kobis_movies.csv"
     df = pd.read_csv(url)
 
-    # 장르 전처리: '|' 기호로 구분된 여러 장르 중 첫 번째 장르만 추출
-    df["genre"] = df["genre"].astype(str).apply(lambda x: x.split("|")[0])
+    # 장르 전처리: 파이썬 최신 라이브러리 버전에 안전한 .str 전용 메서드 사용
+    df["genre"] = df["genre"].astype(str).str.split("|").str[0]
 
     # 영화 편수 계산을 위한 임시 컬럼 추가
     df["movie_count"] = 1
