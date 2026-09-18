@@ -15,10 +15,15 @@ def load_data():
     url = "https://raw.githubusercontent.com/greatsong/modudata/main/data/kobis_movies.csv"
     df = pd.read_csv(url)
 
-    # 장르 전처리: '|' 기호로 구분된 여러 장르 중 첫 번째 장르만 추출
-    df["genre"] = df["genre"].astype(str).apply(lambda x: x.split("|")[0])
-    
-    # 영화 편수 계산을 위한 임시 컬럼 추가
+    # 장르 전처리 (PyArrow 호환 안전 방식)
+    df["genre"] = df["genre"].astype(str).str.split("|").str[0]
+
+    # 숫자형 컬럼 결측치 처리 및 형변환
+    df["total_audi"] = pd.to_numeric(df["total_audi"], errors="coerce").fillna(0)
+    df["first_scrn"] = pd.to_numeric(df["first_scrn"], errors="coerce").fillna(0)
+    df["first_week_audi"] = pd.to_numeric(df["first_week_audi"], errors="coerce").fillna(0)
+
+    # 영화 편수 계산용 컬럼
     df["movie_count"] = 1
 
     return df
@@ -64,16 +69,19 @@ st.markdown("---")
 # ---------------------------------------------------------
 st.subheader("2. 장르 및 영화별 총 관객수 분포")
 
+# 장르 및 영화별 중복 집계 방지
+df_treemap = df.groupby(["genre", "movieNm"], as_index=False)["total_audi"].sum()
+
 fig2 = px.treemap(
-    df,
-    path=[px.Constant("전체 장르"), "genre", "movieNm"],
+    df_treemap,
+    path=["genre", "movieNm"],
     values="total_audi",
     title="장르 및 영화별 총 관객수 트리맵",
     color="genre",
 )
+
 fig2.update_traces(
-    hovertemplate="<b>%{label}</b><br>총 관객수: %{value:,}명",
-    texttemplate="<b>%{label}</b><br>%{value:,}명",
+    hovertemplate="<b>%{label}</b><br>총 관객수: %{value:,.0f}명"
 )
 
 st.plotly_chart(fig2, use_container_width=True)
@@ -106,7 +114,7 @@ st.plotly_chart(fig3, use_container_width=True)
 # 주요 통계 데이터 산출
 top_movie_row = df.loc[df["total_audi"].idxmax()]
 top_movie_name = top_movie_row["movieNm"]
-top_movie_audi = top_movie_row["total_audi"]
+top_movie_audi = int(top_movie_row["total_audi"])
 
 under_2m_count = (df["total_audi"] <= 2000000).sum()
 under_2m_ratio = (under_2m_count / len(df)) * 100
@@ -144,7 +152,7 @@ fig4 = px.scatter(
 )
 
 fig4.update_traces(
-    hovertemplate="<b>%{hovertext}</b><br>개봉일 스크린수: %{x:,}개<br>총 관객수: %{y:,}명"
+    hovertemplate="<b>%{hovertext}</b><br>개봉일 스크린수: %{x:,.0f}개<br>총 관객수: %{y:,.0f}명"
 )
 
 st.plotly_chart(fig4, use_container_width=True)
@@ -160,7 +168,6 @@ st.markdown("---")
 # ---------------------------------------------------------
 st.subheader("5. 주요 장르별 총 관객수 분포 (10편 이상 장르)")
 
-# 영화 수가 10편 이상인 장르 필터링
 genre_counts_series = df["genre"].value_counts()
 top_genres = genre_counts_series[genre_counts_series >= 10].index
 df_filtered = df[df["genre"].isin(top_genres)]
@@ -173,11 +180,11 @@ fig5 = px.box(
     hover_name="movieNm",
     title="영화 수 10편 이상 장르의 관객수 박스플롯",
     labels={"genre": "장르", "total_audi": "총 관객수 (명)"},
-    points="outliers",  # 이상치(아웃라이어) 점 표시
+    points="outliers",
 )
 
 fig5.update_traces(
-    hovertemplate="<b>%{hovertext}</b><br>장르: %{x}<br>총 관객수: %{y:,}명"
+    hovertemplate="<b>%{hovertext}</b><br>장르: %{x}<br>총 관객수: %{y:,.0f}명"
 )
 
 st.plotly_chart(fig5, use_container_width=True)
@@ -211,7 +218,7 @@ fig6 = px.scatter(
 )
 
 fig6.update_traces(
-    hovertemplate="<b>%{hovertext}</b><br>개봉일 스크린수: %{x:,}개<br>총 관객수: %{y:,}명<br>개봉 첫 주 관객: %{marker.size:,}명"
+    hovertemplate="<b>%{hovertext}</b><br>개봉일 스크린수: %{x:,.0f}개<br>총 관객수: %{y:,.0f}명<br>개봉 첫 주 관객: %{marker.size:,.0f}명"
 )
 
 st.plotly_chart(fig6, use_container_width=True)
@@ -227,18 +234,19 @@ st.markdown("---")
 # ---------------------------------------------------------
 st.subheader("7. 제작 국가 및 장르별 영화 편수 (선버스트 그래프)")
 
+df_sunburst = df.groupby(["nation", "genre"], as_index=False)["movie_count"].sum()
+
 fig7 = px.sunburst(
-    df,
-    path=[px.Constant("전체 국가"), "nation", "genre"],
+    df_sunburst,
+    path=["nation", "genre"],
     values="movie_count",
     title="제작 국가별 주력 장르 선버스트",
     color="nation",
 )
 
-# 마우스오버 툴팁 설정
 fig7.update_traces(
     hovertemplate="<b>%{label}</b><br>영화 편수: %{value}편",
-    textinfo="label+percent parent" # 해당 구역의 이름과 상위 항목 대비 비율 표시
+    textinfo="label+percent parent",
 )
 
 st.plotly_chart(fig7, use_container_width=True)
